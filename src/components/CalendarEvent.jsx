@@ -1,151 +1,163 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import PageHeader from './PageHeader.jsx'
 
+const EXAMPLES = [
+  'Add dinner tonight at 20:00 at Restaurant X with my wife',
+  'Schedule a dentist appointment next Monday at 10am for 1 hour',
+  "What's on my calendar this week?",
+  'Delete my meeting on Friday',
+  "Move Thursday's call to Friday at the same time",
+]
+
 export default function CalendarEvent({ onBack }) {
-  const [form, setForm] = useState({
-    title: '', date: '', time: '', duration: '60', location: '', notes: '', guests: ''
-  })
-  const [status, setStatus] = useState(null)
-  const [aiLoading, setAiLoading] = useState(false)
+  const [messages, setMessages] = useState([]) // { role: 'user'|'assistant', content }
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const bottomRef = useRef(null)
 
-  const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }))
+  useEffect(() => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages, loading])
 
-  const handleAISuggest = async () => {
-    if (!form.title) return
-    setAiLoading(true)
+  const send = async (text) => {
+    const userMsg = { role: 'user', content: text }
+    const history = [...messages, userMsg]
+    setMessages(history)
+    setInput('')
+    setLoading(true)
+
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('http://localhost:3002/api/calendar', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 500,
-          messages: [{
-            role: 'user',
-            content: `Suggest a short agenda/notes for a calendar event titled: "${form.title}". Return only 3-4 bullet points of agenda items, plain text, no markdown formatting.`
-          }]
-        })
+        body: JSON.stringify({ messages: history }),
       })
-      const data = await response.json()
-      const text = data.content?.find(b => b.type === 'text')?.text || ''
-      setForm(f => ({ ...f, notes: text }))
-    } catch {}
-    setAiLoading(false)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setMessages(prev => [...prev, { role: 'assistant', content: data.message }])
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `✗ ${err.message}` }])
+    }
+    setLoading(false)
   }
 
-  const handleCreate = async () => {
-    setStatus('creating')
-    // Calls Google Calendar MCP via Node backend in production
-    await new Promise(r => setTimeout(r, 1200))
-    setStatus('created')
-    setTimeout(() => {
-      setStatus(null)
-      setForm({ title: '', date: '', time: '', duration: '60', location: '', notes: '', guests: '' })
-    }, 2500)
+  const handleKeyDown = e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (input.trim()) send(input.trim()) }
   }
 
   return (
     <PageHeader
       icon="◷"
-      label="Create Event"
+      label="Calendar"
       color="var(--blue)"
       bg="var(--blue-dim)"
       border="rgba(96,165,250,0.25)"
       onBack={onBack}
     >
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }} className="fade-in">
-        <Field label="Event Title">
-          <input type="text" value={form.title} onChange={set('title')} placeholder="What's the occasion?" style={inputStyle} />
-        </Field>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="fade-in">
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-          <Field label="Date">
-            <input type="date" value={form.date} onChange={set('date')} style={inputStyle} />
-          </Field>
-          <Field label="Time">
-            <input type="time" value={form.time} onChange={set('time')} style={inputStyle} />
-          </Field>
-          <Field label="Duration (min)">
-            <select value={form.duration} onChange={set('duration')} style={inputStyle}>
-              <option value="15">15 min</option>
-              <option value="30">30 min</option>
-              <option value="60">1 hour</option>
-              <option value="90">1.5 hours</option>
-              <option value="120">2 hours</option>
-            </select>
-          </Field>
-        </div>
-
-        <Field label="Location (optional)">
-          <input type="text" value={form.location} onChange={set('location')} placeholder="Zoom, Office, Coffee shop..." style={inputStyle} />
-        </Field>
-
-        <Field label="Guests (optional)">
-          <input type="text" value={form.guests} onChange={set('guests')} placeholder="email@example.com, another@example.com" style={inputStyle} />
-        </Field>
-
-        <Field label="Notes / Agenda">
-          <div style={{ position: 'relative' }}>
-            <textarea
-              value={form.notes}
-              onChange={set('notes')}
-              placeholder="Agenda, notes, preparation..."
-              rows={5}
-              style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.7 }}
-            />
-            {form.title && (
+        {/* Conversation */}
+        {messages.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <p style={labelStyle}>Examples</p>
+            {EXAMPLES.map((ex, i) => (
               <button
-                onClick={handleAISuggest}
-                disabled={aiLoading}
-                style={{
-                  position: 'absolute', bottom: 10, right: 10,
-                  background: 'var(--accent-glow)', border: '1px solid var(--accent-border)',
-                  color: 'var(--accent)', borderRadius: 6, padding: '5px 10px',
-                  fontSize: 11, fontWeight: 500, cursor: 'pointer', opacity: aiLoading ? 0.5 : 1,
-                }}
+                key={i}
+                onClick={() => send(ex)}
+                style={exampleBtn}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(96,165,250,0.4)'; e.currentTarget.style.color = 'var(--blue)' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--text-muted)' }}
               >
-                {aiLoading ? 'Drafting...' : '✦ Suggest Agenda'}
+                {ex}
               </button>
-            )}
-          </div>
-        </Field>
-
-        {status === 'created' ? (
-          <div style={{ background: 'var(--blue-dim)', border: '1px solid rgba(96,165,250,0.3)', borderRadius: 8, padding: '12px 16px', color: 'var(--blue)', fontSize: 14, fontWeight: 500 }}>
-            ✓ Event created in Google Calendar
+            ))}
           </div>
         ) : (
-          <button
-            onClick={handleCreate}
-            disabled={!form.title || !form.date || status === 'creating'}
-            style={{
-              background: 'var(--blue-dim)', border: '1px solid rgba(96,165,250,0.3)',
-              borderRadius: 8, padding: '12px 20px', color: 'var(--blue)',
-              fontSize: 14, fontWeight: 500, cursor: 'pointer', alignSelf: 'flex-start', minWidth: 180,
-              opacity: (!form.title || !form.date) ? 0.5 : 1,
-            }}
-          >
-            {status === 'creating' ? 'Creating...' : 'Create Event →'}
-          </button>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {messages.map((msg, i) => (
+              <div key={i} style={{ display: 'flex', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                <div style={{
+                  maxWidth: '80%',
+                  padding: '10px 14px',
+                  borderRadius: msg.role === 'user' ? '12px 12px 4px 12px' : '12px 12px 12px 4px',
+                  background: msg.role === 'user' ? 'var(--blue-dim)' : 'var(--bg-card)',
+                  border: msg.role === 'user' ? '1px solid rgba(96,165,250,0.25)' : '1px solid var(--border)',
+                  color: msg.role === 'user' ? 'var(--blue)' : 'var(--text-secondary)',
+                  fontSize: 14, lineHeight: 1.7, whiteSpace: 'pre-wrap',
+                }}>
+                  {msg.content}
+                </div>
+              </div>
+            ))}
+            {loading && (
+              <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
+                <div style={{
+                  padding: '10px 14px', borderRadius: '12px 12px 12px 4px',
+                  background: 'var(--bg-card)', border: '1px solid var(--border)',
+                  color: 'var(--text-muted)', fontSize: 13,
+                }}>
+                  <span style={{ animation: 'pulse 1s infinite' }}>◉</span> Working...
+                </div>
+              </div>
+            )}
+            <div ref={bottomRef} />
+          </div>
         )}
+
+        {/* Input */}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <textarea
+            value={input}
+            onChange={e => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={messages.length === 0 ? 'Add dinner tonight at 20:00...' : 'Reply...'}
+            rows={1}
+            style={{ ...inputStyle, flex: 1, resize: 'none' }}
+          />
+          <button
+            onClick={() => input.trim() && send(input.trim())}
+            disabled={!input.trim() || loading}
+            style={{ ...sendBtn, opacity: !input.trim() || loading ? 0.4 : 1 }}
+          >
+            {loading ? '...' : '→'}
+          </button>
+          {messages.length > 0 && (
+            <button onClick={() => setMessages([])} style={clearBtn} title="Clear">↺</button>
+          )}
+        </div>
+        <p style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: -8 }}>
+          Enter to send · Shift+Enter for new line
+        </p>
       </div>
     </PageHeader>
   )
 }
 
-function Field({ label, children }) {
-  return (
-    <div>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 500, color: 'var(--text-muted)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 7 }}>
-        {label}
-      </label>
-      {children}
-    </div>
-  )
+const labelStyle = {
+  fontSize: 11, fontWeight: 500, color: 'var(--text-muted)',
+  letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2,
 }
 
 const inputStyle = {
   width: '100%', background: 'var(--bg-card)', border: '1px solid var(--border)',
   borderRadius: 8, padding: '10px 14px', color: 'var(--text-primary)',
-  fontSize: 14, outline: 'none', colorScheme: 'dark',
+  fontSize: 14, outline: 'none', boxSizing: 'border-box', lineHeight: 1.6,
+}
+
+const exampleBtn = {
+  background: 'none', border: '1px solid var(--border)', borderRadius: 7,
+  padding: '8px 12px', color: 'var(--text-muted)', fontSize: 13,
+  cursor: 'pointer', textAlign: 'left', transition: 'border-color 0.15s, color 0.15s',
+}
+
+const sendBtn = {
+  background: 'var(--blue-dim)', border: '1px solid rgba(96,165,250,0.3)',
+  borderRadius: 8, padding: '10px 16px', color: 'var(--blue)',
+  fontSize: 16, fontWeight: 500, cursor: 'pointer', flexShrink: 0,
+}
+
+const clearBtn = {
+  background: 'none', border: '1px solid var(--border)', borderRadius: 8,
+  padding: '10px 12px', color: 'var(--text-muted)', fontSize: 14,
+  cursor: 'pointer', flexShrink: 0,
 }

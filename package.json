@@ -4,13 +4,20 @@
   "description": "Fairy - Your personal AI assistant",
   "scripts": {
     "dev": "vite",
+    "server": "node server.js",
     "build": "vite build",
     "preview": "vite preview"
   },
   "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "googleapis": "^172.0.0",
+    "lucide-react": "^0.383.0",
+    "nodemailer": "^8.0.9",
+    "openai": "^6.39.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",
-    "lucide-react": "^0.383.0"
+    "react-dom": "^18.2.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.2.0",

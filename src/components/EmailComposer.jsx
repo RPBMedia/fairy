@@ -35,13 +35,22 @@ export default function EmailComposer({ onBack }) {
 
   const handleSend = async () => {
     setStatus('sending')
-    // In a real integration, this calls the Gmail MCP via your Node backend
-    await new Promise(r => setTimeout(r, 1200))
-    setStatus('sent')
-    setTimeout(() => {
-      setStatus(null)
-      setForm({ to: '', subject: '', body: '' })
-    }, 2500)
+    try {
+      const res = await fetch('http://localhost:3002/api/send-email', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setStatus('sent')
+      setTimeout(() => {
+        setStatus(null)
+        setForm({ to: '', subject: '', body: '' })
+      }, 2500)
+    } catch (err) {
+      setStatus({ error: err.message })
+    }
   }
 
   return (
@@ -108,6 +117,10 @@ export default function EmailComposer({ onBack }) {
 
         {status === 'sent' ? (
           <div style={successBanner}>✓ Email sent successfully</div>
+        ) : status?.error ? (
+          <div style={{ ...successBanner, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)', color: '#f87171' }}>
+            ✗ {status.error}
+          </div>
         ) : (
           <button
             onClick={handleSend}
