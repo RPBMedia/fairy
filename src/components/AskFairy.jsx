@@ -27,21 +27,16 @@ export default function AskFairy({ onBack }) {
 
     try {
       const history = [...messages, { role: 'user', content: userText }]
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const res = await fetch('http://localhost:3002/api/ask', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1000,
-          system: `You are Fairy, a personal day assistant. You help users manage their communications and calendar. You can help them compose emails, schedule events, draft WhatsApp messages, and handle daily tasks. Be concise, warm, and practical. When the user asks you to do something that requires integration (send email, create calendar event), acknowledge the action and describe what you'd do, since this is a demo.`,
-          messages: history.map(m => ({ role: m.role, content: m.content }))
-        })
+        body: JSON.stringify({ messages: history }),
       })
-      const data = await response.json()
-      const reply = data.content?.find(b => b.type === 'text')?.text || 'Sorry, something went wrong.'
-      setMessages(prev => [...prev, { role: 'assistant', content: reply }])
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Connection error. Please try again.' }])
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`)
+      setMessages(prev => [...prev, { role: 'assistant', content: data.message }])
+    } catch (err) {
+      setMessages(prev => [...prev, { role: 'assistant', content: `✗ ${err.message}` }])
     }
     setLoading(false)
   }

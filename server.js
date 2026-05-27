@@ -269,5 +269,68 @@ Use the available tools to fulfill the user's request. If you need to update or 
   }
 })
 
+app.post('/api/ask', async (req, res) => {
+  const { messages: history } = req.body
+  if (!history?.length) return res.status(400).json({ error: 'messages are required' })
+
+  try {
+    const userTZ = Intl.DateTimeFormat().resolvedOptions().timeZone
+    const localNow = new Date().toLocaleString('en-GB', {
+      timeZone: userTZ, dateStyle: 'full', timeStyle: 'short',
+    })
+
+    const messages = [
+      {
+        role: 'system',
+        content: `You are Fairy, a personal AI assistant. The current local date and time is: ${localNow} (${userTZ}).
+You have tools to send emails and manage Google Calendar events. When the user asks you to take an action, use the appropriate tools to actually do it — don't just describe it.
+Be concise and confirm what you did after completing actions.`,
+      },
+      ...history,
+    ]
+
+    const allTools = [...emailTools, ...calendarTools]
+
+    for (let i = 0; i < 8; i++) {
+      const response = await openai.chat.completions.create({
+        model: 'gpt-4o',
+        messages,
+        tools: allTools,
+      })
+
+      const choice = response.choices[0]
+      messages.push(choice.message)
+
+      if (choice.finish_reason === 'stop') {
+        return res.json({ success: true, message: choice.message.content })
+      }
+
+      if (choice.finish_reason === 'tool_calls') {
+        for (const toolCall of choice.message.tool_calls) {
+          const args = JSON.parse(toolCall.function.arguments)
+          let result
+
+          if (toolCall.function.name === 'send_email') {
+            await transporter.sendMail({
+              from: `Fairy <${process.env.GMAIL_USER}>`,
+              to: args.to, subject: args.subject, text: args.body,
+            })
+            result = 'Email sent successfully.'
+          } else {
+            result = await executeCalendarTool(toolCall.function.name, args)
+          }
+
+          messages.push({ role: 'tool', tool_call_id: toolCall.id, content: result })
+        }
+      }
+    }
+
+    res.status(500).json({ error: 'Agent did not complete in time' })
+  } catch (err) {
+    console.error(err)
+    res.status(500).json({ error: err.message })
+  }
+})
+
 const PORT = 3002
 app.listen(PORT, () => console.log(`Fairy MCP server running on :${PORT}`))
