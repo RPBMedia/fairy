@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <!-- Background -->
+  <rect width="100" height="100" rx="22" fill="#1c1917"/>
+
+  <!-- Left wing: thin teardrop sweeping up-left from shoulder -->
+  <path d="M45 56 C34 50 10 36 7 13 C19 24 40 48 45 56Z" fill="#FBBF24"/>
+
+  <!-- Right wing: mirror -->
+  <path d="M55 56 C66 50 90 36 93 13 C81 24 60 48 55 56Z" fill="#FBBF24"/>
+
+  <!-- Wing shimmer veins -->
+  <path d="M45 56 C32 46 12 30 7 13" stroke="#FDE68A" stroke-width="0.8" fill="none" opacity="0.6"/>
+  <path d="M55 56 C68 46 88 30 93 13" stroke="#FDE68A" stroke-width="0.8" fill="none" opacity="0.6"/>
+
+  <!-- Torso -->
+  <ellipse cx="50" cy="62" rx="5" ry="8" fill="#FBBF24"/>
+
+  <!-- Dress/skirt -->
+  <path d="M45 67 Q42 83 50 89 Q58 83 55 67Z" fill="#FBBF24"/>
+
+  <!-- Head -->
+  <circle cx="50" cy="41" r="10" fill="#FBBF24"/>
+
+  <!-- 4-pointed sparkle, top-right -->
+  <path d="M82 12 L83.5 17 L89 18 L83.5 19 L82 24 L80.5 19 L75 18 L80.5 17Z" fill="white" opacity="0.95"/>
+
+  <!-- Tiny sparkle dots -->
+  <circle cx="75" cy="10" r="1.5" fill="white" opacity="0.7"/>
+  <circle cx="91" cy="27" r="1.2" fill="white" opacity="0.55"/>
+</svg>
